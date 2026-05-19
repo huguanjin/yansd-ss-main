@@ -1,0 +1,12 @@
+services:
+  yansd-ss:
+    image: ghcr.io/fistbaozi/yansd-ss:v1.0
+    container_name: yansd-ss
+    network_mode: host
+    restart: unless-stopped
+    environment:
+      - WEB_PORT=15231         # Web 管理面板端口
+      - SS_METHOD=chacha20-ietf-poly1305  # 加密方式
+      - SS_MANAGER_PORT=6001   # ss-manager 内部管理端口
+    volumes:
+      - ./data:/data           # 持久化配置和数据

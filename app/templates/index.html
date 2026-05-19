@@ -1,0 +1,153 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>SS 管理面板</title>
+<link rel="stylesheet" href="/static/style.css">
+</head>
+<body>
+<div class="header">
+  <h1>⚡ Shadowsocks 管理面板</h1>
+  <div class="header-right">
+    <span class="method-badge">{{ method }}</span>
+    <button class="btn btn-sm btn-ghost" onclick="logout()">退出</button>
+  </div>
+</div>
+
+<div class="container">
+  <!-- 新增端口表单 -->
+  <div class="card add-card">
+    <h2>添加端口</h2>
+    <form id="addForm">
+      <div class="form-row">
+        <div class="field">
+          <label>端口</label>
+          <input type="number" id="f_port" min="1024" max="65535" placeholder="1024-65535" value="15231" required>
+        </div>
+        <div class="field">
+          <label>密码</label>
+          <div class="pwd-row">
+            <input type="text" id="f_pwd" placeholder="访问密码" required minlength="4">
+            <button type="button" class="btn btn-sm" onclick="genPwd()">随机</button>
+          </div>
+        </div>
+        <div class="field">
+          <label>有效期</label>
+          <input type="date" id="f_expires" placeholder="留空为永久">
+        </div>
+        <div class="field">
+          <label>备注</label>
+          <input type="text" id="f_remark" placeholder="可选备注">
+        </div>
+        <div class="field field-btn">
+          <button type="submit" class="btn btn-primary">添加</button>
+        </div>
+      </div>
+    </form>
+  </div>
+
+  <!-- 端口列表 -->
+  <div class="card">
+    <div class="table-header">
+      <h2>端口列表</h2>
+      <button class="btn btn-sm" onclick="loadPorts()">刷新</button>
+    </div>
+    <div class="table-wrap">
+      <table>
+        <thead>
+          <tr>
+            <th>端口</th>
+            <th>密码</th>
+            <th>备注</th>
+            <th>有效期</th>
+            <th>创建时间</th>
+            <th>操作</th>
+          </tr>
+        </thead>
+        <tbody id="tbody"></tbody>
+      </table>
+      <p class="empty" id="emptyMsg" style="display:none">暂无端口，请添加</p>
+    </div>
+  </div>
+
+  <!-- 规则管理 -->
+  <div class="card">
+    <div class="table-header">
+      <h2>分流规则管理</h2>
+      <div class="rules-actions">
+        <button class="btn btn-sm" onclick="refreshRules()">刷新</button>
+        <button class="btn btn-sm btn-warn" onclick="restoreRules()">恢复原规则</button>
+        <button class="btn btn-sm btn-primary" onclick="saveRules()">保存规则</button>
+      </div>
+    </div>
+    <div class="proxy-group-row">
+      <label>代理组名称：</label>
+      <input type="text" id="proxyGroupName" placeholder="加载中..." style="width:160px">
+      <button class="btn btn-sm btn-primary" onclick="saveProxyGroupName()">修改</button>
+    </div>
+    <!-- 编辑模式切换 -->
+    <div class="rule-tabs">
+      <button class="rule-tab active" id="tabVisual" onclick="switchRuleTab('visual')">可视化编辑</button>
+      <button class="rule-tab" id="tabRaw" onclick="switchRuleTab('raw')">原文编辑</button>
+    </div>
+    <!-- 可视化编辑 -->
+    <div id="visualEditor">
+      <div class="rule-add-row">
+        <select id="rule_type">
+          <option value="DOMAIN">DOMAIN</option>
+          <option value="DOMAIN-SUFFIX" selected>DOMAIN-SUFFIX</option>
+          <option value="DOMAIN-KEYWORD">DOMAIN-KEYWORD</option>
+          <option value="IP-CIDR">IP-CIDR</option>
+          <option value="IP-CIDR6">IP-CIDR6</option>
+          <option value="GEOIP">GEOIP</option>
+          <option value="MATCH">MATCH</option>
+        </select>
+        <input type="text" id="rule_value" placeholder="匹配值，如 google.com">
+        <select id="rule_action">
+          <option value="DIRECT">DIRECT</option>
+          <option value="REJECT">REJECT</option>
+        </select>
+        <input type="text" id="rule_extra" placeholder="额外参数(可选)" style="max-width:140px">
+        <button class="btn btn-sm btn-primary" onclick="addRule()">添加</button>
+      </div>
+      <div class="table-wrap" style="max-height:500px;overflow-y:auto;">
+        <table>
+          <thead>
+            <tr>
+              <th style="width:40px">#</th>
+              <th>类型</th>
+              <th>匹配值</th>
+              <th>动作</th>
+              <th>额外</th>
+              <th style="width:120px">操作</th>
+            </tr>
+          </thead>
+          <tbody id="rulesTbody"></tbody>
+        </table>
+        <p class="empty" id="rulesEmptyMsg" style="display:none">暂无规则</p>
+      </div>
+    </div>
+    <!-- 原文编辑 -->
+    <div id="rawEditor" style="display:none">
+      <textarea id="rawRulesText" rows="20" spellcheck="false" placeholder="rules:&#10;    - 'DOMAIN-SUFFIX,google.com,烟神殿'&#10;    - 'MATCH,DIRECT'"></textarea>
+    </div>
+  </div>
+</div>
+
+<!-- 复制弹窗 -->
+<div class="copy-overlay" id="copyOverlay" onclick="closeCopyDialog(event)">
+  <div class="copy-dialog">
+    <h3>请手动复制以下内容</h3>
+    <textarea id="copyDialogText" readonly rows="3" onclick="this.select()"></textarea>
+    <div style="text-align:right;margin-top:12px">
+      <button class="btn btn-sm btn-primary" onclick="document.getElementById('copyOverlay').style.display='none'">关闭</button>
+    </div>
+  </div>
+</div>
+
+<div class="toast" id="toast"></div>
+
+<script src="/static/app.js"></script>
+</body>
+</html>
