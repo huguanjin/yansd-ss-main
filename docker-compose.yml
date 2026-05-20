@@ -1,6 +1,6 @@
 services:
   yansd-ss:
-    image: ghcr.io/fistbaozi/yansd-ss:v1.0
+    image: ghcr.io/huguanjin/yansd-ss-main:latest
     container_name: yansd-ss
     network_mode: host
     restart: unless-stopped
