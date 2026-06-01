@@ -1,0 +1,1 @@
+docker rm -f pocket-relay && docker pull ghcr.io/huguanjin/yansd-ss-main:latest && docker run -d   -p 8011:80   -v $(pwd)/pocketdata:/data   -e ADMIN_USERNAME=admin   -e ADMIN_PASSWORD=密码   --name pocket-relay   ghcr.io/huguanjin/yansd-ss-main:latest && docker image prune -f
