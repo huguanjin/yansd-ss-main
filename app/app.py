@@ -201,20 +201,15 @@ def setup_page():
         return redirect(url_for("login_page"))
     return render_template("setup.html")
 
-@app.route("/api/setup", methods=["POST"])
-def api_setup():
-    if is_configured():
-        return jsonify({"error": "已完成设置，不可重复操作"}), 403
-
-    data = request.get_json(silent=True) or {}
-    password = data.get("password", "")
-    mongo_uri = data.get("mongo_uri", "").strip()
-    db_name = data.get("db_name", "").strip() or "yansd-ss"
+def perform_setup(password, mongo_uri, db_name):
+    """执行初始设置：校验参数、连接 MongoDB、写入配置和管理员密码。返回 (ok, error_msg)"""
+    mongo_uri = (mongo_uri or "").strip()
+    db_name = (db_name or "").strip() or "yansd-ss"
 
     if not password or len(password) < 4:
-        return jsonify({"error": "密码至少 4 个字符"}), 400
+        return False, "密码至少 4 个字符"
     if not mongo_uri:
-        return jsonify({"error": "请填写 MongoDB 连接字符串"}), 400
+        return False, "请填写 MongoDB 连接字符串"
 
     # 验证 MongoDB 连接
     try:
@@ -222,7 +217,7 @@ def api_setup():
         client.admin.command("ping")
         client.close()
     except Exception as e:
-        return jsonify({"error": f"MongoDB 连接失败: {e}"}), 400
+        return False, f"MongoDB 连接失败: {e}"
 
     # 保存连接字符串和数据库名到本地
     save_config({"mongo_uri": mongo_uri, "db_name": db_name})
@@ -238,7 +233,41 @@ def api_setup():
             upsert=True
         )
     except Exception as e:
-        return jsonify({"error": f"数据库初始化失败: {e}"}), 500
+        return False, f"数据库初始化失败: {e}"
+
+    return True, None
+
+def auto_setup_from_env():
+    """如果环境变量提供了 MongoDB 连接和管理员密码，则在启动时自动完成初始设置"""
+    if is_configured():
+        return
+    mongo_uri = os.environ.get("MONGO_URI")
+    admin_password = os.environ.get("ADMIN_PASSWORD")
+    db_name = os.environ.get("DB_NAME", "yansd-ss")
+
+    if not mongo_uri or not admin_password:
+        return
+
+    ok, err = perform_setup(admin_password, mongo_uri, db_name)
+    if ok:
+        print("[INFO] 已通过环境变量自动完成初始设置")
+    else:
+        print(f"[WARN] 环境变量自动初始设置失败，将回退到手动设置页面: {err}")
+
+@app.route("/api/setup", methods=["POST"])
+def api_setup():
+    if is_configured():
+        return jsonify({"error": "已完成设置，不可重复操作"}), 403
+
+    data = request.get_json(silent=True) or {}
+    password = data.get("password", "")
+    mongo_uri = data.get("mongo_uri", "")
+    db_name = data.get("db_name", "")
+
+    ok, err = perform_setup(password, mongo_uri, db_name)
+    if not ok:
+        status = 500 if err.startswith("数据库初始化失败") else 400
+        return jsonify({"error": err}), status
 
     return jsonify({"ok": True})
 
@@ -605,6 +634,9 @@ def update_proxy_group_name():
 if __name__ == "__main__":
     # 等待 ss-manager 启动
     time.sleep(2)
+
+    # 如果提供了环境变量，自动完成初始设置
+    auto_setup_from_env()
 
     # 如果已配置，初始化数据库并同步端口
     if is_configured():

@@ -1,6 +1,6 @@
 services:
   yansd-ss:
-    image: ghcr.io/fistbaozi/yansd-ss:v1.0
+    image: ghcr.io/huguanjin/yansd-ss-main:latest
     container_name: yansd-ss
     network_mode: host
     restart: unless-stopped
@@ -8,5 +8,22 @@ services:
       - WEB_PORT=15231         # Web 管理面板端口
       - SS_METHOD=chacha20-ietf-poly1305  # 加密方式
       - SS_MANAGER_PORT=6001   # ss-manager 内部管理端口
+      - MONGO_URI=mongodb://yansd:CHANGE_ME_STRONG_PASSWORD@127.0.0.1:27017/?authSource=admin
+      - DB_NAME=yansd-ss       # 数据库名称，留空默认为 yansd-ss
+      - ADMIN_PASSWORD=CHANGE_ME_ADMIN_PASSWORD  # 管理面板登录密码，至少 4 位
     volumes:
       - ./data:/data           # 持久化配置和数据
+    depends_on:
+      - mongodb
+
+  mongodb:
+    image: mongo:7
+    container_name: yansd-mongo
+    restart: unless-stopped
+    environment:
+      - MONGO_INITDB_ROOT_USERNAME=yansd
+      - MONGO_INITDB_ROOT_PASSWORD=CHANGE_ME_STRONG_PASSWORD
+    ports:
+      - "127.0.0.1:27017:27017"  # 仅绑定本地回环，不对公网开放
+    volumes:
+      - ./mongo-data:/data/db    # 持久化数据库文件
