@@ -203,6 +203,7 @@ def setup_page():
 
 def perform_setup(password, mongo_uri, db_name):
     """执行初始设置：校验参数、连接 MongoDB、写入配置和管理员密码。返回 (ok, error_msg)"""
+    global _config_cache, _mongo_client, _mongo_db
     mongo_uri = (mongo_uri or "").strip()
     db_name = (db_name or "").strip() or "yansd-ss"
 
@@ -219,10 +220,12 @@ def perform_setup(password, mongo_uri, db_name):
     except Exception as e:
         return False, f"MongoDB 连接失败: {e}"
 
-    # 保存连接字符串和数据库名到本地
-    save_config({"mongo_uri": mongo_uri, "db_name": db_name})
+    # 先在内存中临时生效配置，供 init_db/get_db 使用，此时尚未写入磁盘，
+    # 避免 init_db 失败时留下半配置状态（config.json 已存在但连接串无效）
+    _config_cache = {"mongo_uri": mongo_uri, "db_name": db_name}
+    _mongo_client = None
+    _mongo_db = None
 
-    # 初始化数据库并保存密码到 MongoDB
     try:
         init_db()
         salt, hashed = hash_password(password)
@@ -233,7 +236,16 @@ def perform_setup(password, mongo_uri, db_name):
             upsert=True
         )
     except Exception as e:
+        # 回滚内存配置，确保 is_configured() 不会误判为已完成设置
+        _config_cache = None
+        if _mongo_client is not None:
+            _mongo_client.close()
+        _mongo_client = None
+        _mongo_db = None
         return False, f"数据库初始化失败: {e}"
+
+    # 全部成功后才持久化到磁盘
+    save_config({"mongo_uri": mongo_uri, "db_name": db_name})
 
     return True, None
 
